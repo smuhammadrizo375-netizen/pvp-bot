@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="uz"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PvP Duel</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#f3f5fb;--card:#fff;--tx:#1d2140;--mut:#7b809e;--pri:#5b5bf0;--pri2:#8a7bff;--ok:#18b26b;--bad:#e5484d;--sun:#ffb703;--ln:#e6e9f5}
+@media(prefers-color-scheme:dark){:root{--bg:#12142a;--card:#1c1f3d;--tx:#eceefc;--mut:#9398bd;--ln:#2a2e57}}
+*{box-sizing:border-box;margin:0}
+body{font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);padding:0 0 84px;padding-top:env(safe-area-inset-top,0)}
+header{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;padding:18px 16px 26px;border-radius:0 0 26px 26px}
+header small{opacity:.85}header b{display:block;font-size:34px;letter-spacing:-.5px}
+main{padding:14px 14px 0;margin-top:-14px}
+.card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(40,50,120,.07)}
+h3{font-size:17px;margin-bottom:10px}p.m{color:var(--mut);font-size:14px}
+input,select{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--ln);background:var(--bg);color:var(--tx);font:inherit;margin-bottom:8px}
+input:focus{outline:2px solid var(--pri);border-color:transparent}
+button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:13px 16px;background:var(--pri);color:#fff;cursor:pointer;width:100%}
+button.s{background:var(--bg);color:var(--tx);border:1.5px solid var(--ln)}button:disabled{opacity:.5}
+.chips{display:flex;gap:8px;margin-bottom:10px}.chips button{padding:9px 0;font-size:14px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--ln);font-size:15px}.row:last-child{border:0}
+.w{color:var(--ok);font-weight:700}.l{color:var(--bad);font-weight:700}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--ln);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0))}
+nav button{background:none;color:var(--mut);font-size:12px;padding:8px 2px;border-radius:10px}nav button.on{color:var(--pri);background:var(--bg)}nav i{display:block;font-style:normal;font-size:20px}
+.dice{display:flex;justify-content:center;gap:22px;text-align:center;padding:6px 0}.dice div{background:var(--bg);border-radius:18px;padding:14px 22px}.dice b{display:block;font-size:42px}
+.res{text-align:center;font-size:22px;font-weight:800;margin:8px 0}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px}.tabs button{width:auto;white-space:nowrap;padding:9px 14px;background:var(--card);color:var(--mut);font-size:14px}.tabs .on{background:var(--pri);color:#fff}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat div{background:var(--bg);border-radius:14px;padding:12px}.stat b{font-size:22px;display:block}
+#toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;z-index:9;max-width:90%}
+@keyframes sh{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}.spin b{animation:sh .35s infinite}
+@media(prefers-reduced-motion:reduce){.spin b{animation:none}}
+</style></head><body>
+<header><small id="hn">Salom</small><b id="hb">0 ⭐</b><small>Balans</small></header>
+<main id="v"></main>
+<nav id="nav"></nav><div id="toast"></div>
+<script>
+const T=Telegram.WebApp;T.ready();T.expand();
+const B=location.pathname.split('/').pop(),$=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function api(p,body){const r=await fetch('/api/'+p,{method:body?'POST':'GET',headers:{'content-type':'application/json','x-bot':B,'x-init':T.initData},body:body&&JSON.stringify(body)});const j=await r.json();if(!r.ok)throw new Error(j.error||'Xato');return j}
+function toast(m){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.opacity=0,2400)}
+const run=async f=>{try{await f()}catch(e){toast(e.message)}};
+let me,tab='game',sub='stats',poll,bet=100;
+const fmt=n=>Number(n).toLocaleString('en').replace(/,/g,' ');
+async function load(){me=await api('me');$('#hn').textContent='Salom, '+me.name;$('#hb').textContent=fmt(me.balance)+' ⭐';
+ const t=[['game','🎲','O’yin'],['wallet','👛','Hamyon'],['ref','🤝','Referal']];if(me.admin)t.push(['admin','⚙️','Admin']);
+ $('#nav').innerHTML=t.map(([k,i,l])=>`<button class="${tab===k?'on':''}" data-t="${k}" style="flex:1"><i>${i}</i>${l}</button>`).join('');
+ $('#nav').onclick=e=>{const k=e.target.closest('button')?.dataset.t;if(k){tab=k;clearInterval(poll);render()}};render()}
+function render(){({game,wallet,ref,admin})[tab]();}
+function game(){$('#v').innerHTML=`<div class="card"><h3>PvP duel</h3><p class="m" style="margin-bottom:12px">Ikkalangiz ham 2 ta kubik tashlaysiz. Yig‘indisi katta bo‘lgan g‘olib. G‘olib yutuqning ${100-me.cfg.fee}% ini oladi.</p>
+<input id="bet" type="number" inputmode="numeric" min="${me.cfg.min}" value="${bet}"><div class="chips">${[100,500,1000,5000].map(n=>`<button class="s" data-b="${n}">${n}</button>`).join('')}</div>
+<button id="go">Duelga kirish</button></div><div id="arena"></div>
+<div class="card"><h3>So‘nggi o‘yinlar</h3>${me.hist.length?me.hist.map(g=>`<div class="row"><span>${g.bet} ⭐ stavka</span><span class="${g.win?'w':'l'}">${g.win?'+'+g.gain:'−'+g.bet}</span></div>`).join(''):'<p class="m">Hali o‘yin yo‘q. Birinchi duelingizni boshlang.</p>'}</div>`;
+ document.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>$('#bet').value=b.dataset.b);
+ $('#go').onclick=()=>run(async()=>{bet=+$('#bet').value;$('#go').disabled=true;try{const r=await api('pvp/play',{bet});await load0();r.waiting?wait(r.waiting):show(r)}finally{$('#go').disabled=false}})}
+async function load0(){me=await api('me');$('#hb').textContent=fmt(me.balance)+' ⭐'}
+function wait(id){$('#arena').innerHTML=`<div class="card"><h3>Raqib qidirilmoqda…</h3><p class="m" style="margin-bottom:10px">Stavka ${bet} ⭐ ushlab turilibdi. Raqib topilganda natija shu yerda chiqadi.</p><button class="s" id="cx">Bekor qilish va qaytarib olish</button></div>`;
+ $('#cx').onclick=()=>run(async()=>{const r=await api('pvp/cancel',{id}).catch(()=>({}));if(r.cancelled){clearInterval(poll);$('#arena').innerHTML='';await load0();toast('Stavka qaytarildi')}});
+ clearInterval(poll);poll=setInterval(()=>run(async()=>{const r=await api('pvp/status/'+id);if(r.done){clearInterval(poll);await load0();show(r)}else if(r.cancelled)clearInterval(poll)}),2000)}
+function show(r){const a=$('#arena');a.innerHTML=`<div class="card"><div class="dice spin"><div><small>Siz</small><b>🎲</b></div><div><small>Raqib</small><b>🎲</b></div></div></div>`;
+ setTimeout(()=>{a.innerHTML=`<div class="card"><div class="dice"><div><small>Siz</small><b>${r.you}</b></div><div><small>Raqib</small><b>${r.opp}</b></div></div><div class="res ${r.win?'w':'l'}">${r.win?'Yutdingiz! +'+r.gain+' ⭐':'Yutqazdingiz'}</div><button id="ag">Yana o‘ynash</button></div>`;$('#ag').onclick=()=>{a.innerHTML='';load()};T.HapticFeedback?.notificationOccurred(r.win?'success':'error')},900)}
+function wallet(){$('#v').innerHTML=`<div class="card"><h3>Promokod</h3><input id="pc" placeholder="Kodni kiriting" autocapitalize="characters"><button id="pb">Kodni faollashtirish</button></div>
+<div class="card"><h3>Hisob</h3><p class="m">Minimal stavka: ${me.cfg.min} ⭐. Balansni to‘ldirish uchun promokod yoki do‘stlarni taklif qiling.</p></div>`;
+ $('#pb').onclick=()=>run(async()=>{const r=await api('promo',{code:$('#pc').value});toast('+'+r.stars+' ⭐ qo‘shildi');await load()})}
+function ref(){$('#v').innerHTML=`<div class="card"><h3>Do‘stlarni taklif qiling</h3><p class="m" style="margin-bottom:12px">Har bir yangi do‘st uchun ${me.cfg.ref} ⭐ olasiz.</p><input id="rl" readonly value="${esc(me.refLink)}"><button id="cp">Havolani nusxalash</button><button class="s" id="sh" style="margin-top:8px">Telegramda ulashish</button></div>
+<div class="card"><div class="row"><span>Taklif qilinganlar</span><b>${me.refCount}</b></div></div>`;
+ $('#cp').onclick=()=>{navigator.clipboard?.writeText(me.refLink);toast('Nusxalandi')};$('#sh').onclick=()=>T.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(me.refLink))}
+function admin(){const S=[['stats','Statistika'],['users','Foydalanuvchilar'],['promos','Promokodlar'],['set','Sozlamalar'],['games','O‘yinlar']];
+ $('#v').innerHTML=`<div class="tabs">${S.map(([k,l])=>`<button class="${sub===k?'on':''}" data-s="${k}">${l}</button>`).join('')}</div><div id="ad"></div>`;
+ document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{sub=b.dataset.s;admin()});run(()=>A[sub]())}
+const A={
+async stats(){const s=await api('admin/stats');$('#ad').innerHTML=`<div class="card stat"><div><b>${fmt(s.users)}</b>Foydalanuvchi</div><div><b>${fmt(s.games)}</b>O‘yin</div><div><b>${fmt(s.volume)}</b>Aylanma ⭐</div><div><b>${fmt(s.fees)}</b>Komissiya ⭐</div><div><b>${fmt(s.bal)}</b>Balanslar ⭐</div><div><b>${fmt(s.refs)}</b>Referallar</div></div>`},
+async users(){$('#ad').innerHTML=`<div class="card"><h3>Stars berish</h3><input id="gi" placeholder="Telegram ID" inputmode="numeric"><input id="ga" placeholder="Miqdor (⭐)" inputmode="numeric"><button id="gb">Balansga qo‘shish</button></div><div class="card"><input id="uq" placeholder="Ism yoki ID bo‘yicha qidirish"><div id="ul"></div></div>`;
+ $('#gb').onclick=()=>run(async()=>{await api('admin/give',{tgId:$('#gi').value,amount:$('#ga').value});toast('Stars qo‘shildi');ul()});
+ const ul=()=>run(async()=>{const u=await api('admin/users?q='+encodeURIComponent($('#uq').value));$('#ul').innerHTML=u.map(x=>`<div class="row" data-id="${x.id}"><span>${esc(x.name)||'—'}<br><small class="m">${x.id}</small></span><b>${fmt(x.balance)} ⭐</b></div>`).join('')||'<p class="m">Hech kim topilmadi</p>';document.querySelectorAll('[data-id]').forEach(r=>r.onclick=()=>$('#gi').value=r.dataset.id)});
+ $('#uq').oninput=()=>{clearTimeout(ul.t);ul.t=setTimeout(ul,300)};ul()},
+async promos(){const p=await api('admin/promos');$('#ad').innerHTML=`<div class="card"><h3>Yangi promokod</h3><input id="pc" placeholder="Kod (masalan BONUS100)"><input id="ps" placeholder="Necha ⭐" inputmode="numeric"><input id="pm" placeholder="Necha kishi ishlata oladi" inputmode="numeric"><button id="pb">Promokod yaratish</button></div>
+<div class="card"><h3>Promokodlar</h3>${p.map(x=>`<div class="row"><span><b>${esc(x.code)}</b><br><small class="m">${x.stars} ⭐ · ${x.used}/${x.max}</small></span><button class="s" style="width:auto;padding:8px 12px" data-c="${esc(x.code)}">${x.active?'O‘chirish':'Yoqish'}</button></div>`).join('')||'<p class="m">Hali promokod yo‘q</p>'}</div>`;
+ $('#pb').onclick=()=>run(async()=>{await api('admin/promo',{code:$('#pc').value,stars:$('#ps').value,max:$('#pm').value});toast('Yaratildi');A.promos()});
+ document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>run(async()=>{await api('admin/promo/toggle',{code:b.dataset.c});A.promos()}))},
+async set(){const c=me.cfg;$('#ad').innerHTML=`<div class="card"><h3>Sozlamalar</h3><p class="m">Minimal stavka (⭐)</p><input id="s1" type="number" value="${c.min}"><p class="m">Komissiya (%, 0–50)</p><input id="s2" type="number" value="${c.fee}"><p class="m">Referal bonusi (⭐)</p><input id="s3" type="number" value="${c.ref}"><button id="sb">Saqlash</button></div>`;
+ $('#sb').onclick=()=>run(async()=>{me.cfg=await api('admin/settings',{min:$('#s1').value,fee:$('#s2').value,ref:$('#s3').value});toast('Saqlandi')})},
+async games(){const g=await api('admin/games');$('#ad').innerHTML=`<div class="card"><h3>So‘nggi o‘yinlar</h3>${g.map(x=>`<div class="row"><span>#${x.id} · ${x.bet} ⭐<br><small class="m">${x.p1} vs ${x.p2}</small></span><span class="w">${x.winner}</span></div>`).join('')||'<p class="m">Hali o‘yin yo‘q</p>'}</div>`}};
+run(load);
+</script></body></html>
