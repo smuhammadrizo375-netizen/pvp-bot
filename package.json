@@ -1,0 +1,8 @@
+{
+  "name": "pvp-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "@libsql/client": "^0.14.0", "express": "^4.19.2" }
+}
